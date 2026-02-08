@@ -68,3 +68,6 @@ export {
 } from './ui/components';
 
 export {TestArgs, ScreenshotOptions} from './types';
+
+// Testcontainers integration for isolated test environments
+export {startTestEnvironment, stopTestEnvironment} from './testcontainers';
