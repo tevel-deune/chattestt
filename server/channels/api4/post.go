@@ -278,13 +278,29 @@ func getPostsForChannel(c *Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var language string
+	if since == 0 && isMember && c.App.AutoTranslation() != nil {
+		enabled, appErr := c.App.AutoTranslation().IsUserEnabled(channelId, c.AppContext.Session().UserId)
+		if appErr != nil {
+			c.Err = appErr
+			return
+		}
+		if enabled {
+			language, appErr = c.App.AutoTranslation().GetUserLanguage(c.AppContext.Session().UserId, channelId)
+			if appErr != nil {
+				c.Err = appErr
+				return
+			}
+		}
+	}
+
 	var list *model.PostList
 	etag := ""
 
 	if since > 0 {
 		list, err = c.App.GetPostsSince(c.AppContext, model.GetPostsSinceOptions{ChannelId: channelId, Time: since, SkipFetchThreads: skipFetchThreads, CollapsedThreads: collapsedThreads, CollapsedThreadsExtended: collapsedThreadsExtended, UserId: c.AppContext.Session().UserId})
 	} else if afterPost != "" {
-		etag = c.App.GetPostsEtag(channelId, collapsedThreads)
+		etag = c.App.GetPostsEtag(channelId, language, collapsedThreads)
 
 		if c.HandleEtag(etag, "Get Posts After", w, r) {
 			return
@@ -292,7 +308,7 @@ func getPostsForChannel(c *Context, w http.ResponseWriter, r *http.Request) {
 
 		list, err = c.App.GetPostsAfterPost(c.AppContext, model.GetPostsOptions{ChannelId: channelId, PostId: afterPost, Page: page, PerPage: perPage, SkipFetchThreads: skipFetchThreads, CollapsedThreads: collapsedThreads, UserId: c.AppContext.Session().UserId, IncludeDeleted: includeDeleted})
 	} else if beforePost != "" {
-		etag = c.App.GetPostsEtag(channelId, collapsedThreads)
+		etag = c.App.GetPostsEtag(channelId, language, collapsedThreads)
 
 		if c.HandleEtag(etag, "Get Posts Before", w, r) {
 			return
@@ -300,7 +316,7 @@ func getPostsForChannel(c *Context, w http.ResponseWriter, r *http.Request) {
 
 		list, err = c.App.GetPostsBeforePost(c.AppContext, model.GetPostsOptions{ChannelId: channelId, PostId: beforePost, Page: page, PerPage: perPage, SkipFetchThreads: skipFetchThreads, CollapsedThreads: collapsedThreads, CollapsedThreadsExtended: collapsedThreadsExtended, UserId: c.AppContext.Session().UserId, IncludeDeleted: includeDeleted})
 	} else {
-		etag = c.App.GetPostsEtag(channelId, collapsedThreads)
+		etag = c.App.GetPostsEtag(channelId, language, collapsedThreads)
 
 		if c.HandleEtag(etag, "Get Posts", w, r) {
 			return
@@ -386,7 +402,23 @@ func getPostsForChannelAroundLastUnread(c *Context, w http.ResponseWriter, r *ht
 
 	etag := ""
 	if len(postList.Order) == 0 {
-		etag = c.App.GetPostsEtag(channelId, collapsedThreads)
+		var language string
+		if c.App.AutoTranslation() != nil {
+			enabled, appErr := c.App.AutoTranslation().IsUserEnabled(channelId, c.AppContext.Session().UserId)
+			if appErr != nil {
+				c.Err = appErr
+				return
+			}
+			if enabled {
+				language, appErr = c.App.AutoTranslation().GetUserLanguage(c.AppContext.Session().UserId, channelId)
+				if appErr != nil {
+					c.Err = appErr
+					return
+				}
+			}
+		}
+
+		etag = c.App.GetPostsEtag(channelId, language, collapsedThreads)
 
 		if c.HandleEtag(etag, "Get Posts", w, r) {
 			return
